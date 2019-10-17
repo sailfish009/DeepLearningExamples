@@ -50,6 +50,7 @@ class ResnetModel(object):
         compute_format='NCHW',
         input_format='NHWC',
         dtype=tf.float32,
+        use_dali=False,
     ):
 
         self.model_hparams = tf.contrib.training.HParams(
@@ -59,6 +60,7 @@ class ResnetModel(object):
             dtype=dtype,
             layer_counts=(3, 4, 6, 3),
             model_name=model_name,
+            use_dali=use_dali
         )
 
         self.batch_norm_hparams = tf.contrib.training.HParams(
@@ -103,8 +105,8 @@ class ResnetModel(object):
             if "batch_size" not in params.keys():
                 raise RuntimeError("Parameter `batch_size` is missing...")
 
-            if "learning_rate_init" not in params.keys():
-                raise RuntimeError("Parameter `learning_rate` is missing...")
+            if "lr_init" not in params.keys():
+                raise RuntimeError("Parameter `lr_init` is missing...")
 
             if "num_gpus" not in params.keys():
                 raise RuntimeError("Parameter `num_gpus` is missing...")
@@ -120,9 +122,11 @@ class ResnetModel(object):
 
             if "loss_scale" not in params.keys():
                 raise RuntimeError("Parameter `loss_scale` is missing...")
-
+            
+            if "label_smoothing" not in params.keys():
+                raise RuntimeError("Parameter `label_smoothing` is missing...")
                 
-        if mode == tf.estimator.ModeKeys.TRAIN:
+        if mode == tf.estimator.ModeKeys.TRAIN and not self.model_hparams.use_dali:
 
             with tf.device('/cpu:0'):
                 # Stage inputs on the host
@@ -139,7 +143,8 @@ class ResnetModel(object):
 
             # Subtract mean per channel
             # and enforce values between [-1, 1]
-            features = normalized_inputs(features)
+            if not self.model_hparams.use_dali:
+                features = normalized_inputs(features)
 
             # Update Global Step
             global_step = tf.train.get_or_create_global_step()
@@ -205,8 +210,13 @@ class ResnetModel(object):
                     'accuracy_top1': acc_top1,
                     'accuracy_top5': acc_top5
                 }
-
-                cross_entropy = tf.losses.sparse_softmax_cross_entropy(logits=logits, labels=labels)
+                if "label_smoothing" in params.keys() and params['label_smoothing'] != 0.0:
+                    one_hot_labels = tf.one_hot(labels, 1001)
+                    cross_entropy = tf.losses.softmax_cross_entropy(
+                        logits=logits, onehot_labels=one_hot_labels,
+                        label_smoothing=params['label_smoothing'])
+                else:
+                    cross_entropy = tf.losses.sparse_softmax_cross_entropy(logits=logits, labels=labels)
 
                 assert (cross_entropy.dtype == tf.float32)
                 tf.identity(cross_entropy, name='cross_entropy_loss_ref')
@@ -246,11 +256,14 @@ class ResnetModel(object):
                     with tf.device("/cpu:0"):
 
                         learning_rate = learning_rate_scheduler(
-                            learning_rate_init=params["learning_rate_init"],
+                            lr_init=params["lr_init"],
+                            lr_warmup_epochs=params["lr_warmup_epochs"],
                             global_step=global_step,
                             batch_size=params["batch_size"],
                             num_batches_per_epoch=params["steps_per_epoch"],
-                            num_gpus=params["num_gpus"]
+                            num_decay_steps=params["num_decay_steps"],
+                            num_gpus=params["num_gpus"],
+                            use_cosine_lr=params["use_cosine_lr"]
                         )
 
                     tf.identity(learning_rate, name='learning_rate_ref')
@@ -275,8 +288,13 @@ class ResnetModel(object):
 
                     backprop_op = optimizer.minimize(total_loss, gate_gradients=gate_gradients, global_step=global_step)
 
-                    train_ops = tf.group(backprop_op, cpu_prefetch_op, gpu_prefetch_op, update_ops, name='train_ops')
-
+                    
+                    if self.model_hparams.use_dali:
+                    
+                        train_ops = tf.group(backprop_op, update_ops, name='train_ops')
+                    
+                    else:
+                        train_ops = tf.group(backprop_op, cpu_prefetch_op, gpu_prefetch_op, update_ops, name='train_ops')
                     return tf.estimator.EstimatorSpec(mode=mode, loss=total_loss, train_op=train_ops)
 
                 elif mode == tf.estimator.ModeKeys.EVAL:

@@ -43,6 +43,7 @@ if __name__ == "__main__":
         model_dir=FLAGS.results_dir,
         summaries_dir=FLAGS.results_dir,
         data_dir=FLAGS.data_dir,
+        data_idx_dir=FLAGS.data_idx_dir,
 
         # ========= Model HParams ========= #
         n_classes=1001,
@@ -59,16 +60,21 @@ if __name__ == "__main__":
         warmup_steps=FLAGS.warmup_steps,
         batch_size=FLAGS.batch_size,
         log_every_n_steps=FLAGS.display_every,
-        learning_rate_init=FLAGS.lr_init,
+        lr_init=FLAGS.lr_init,
+        lr_warmup_epochs=FLAGS.lr_warmup_epochs,
         weight_decay=FLAGS.weight_decay,
         momentum=FLAGS.momentum,
         loss_scale=FLAGS.loss_scale,
+        label_smoothing=FLAGS.label_smoothing,
+        use_cosine_lr=FLAGS.use_cosine_lr,
         use_static_loss_scaling=FLAGS.use_static_loss_scaling,
         distort_colors=False,
-
+        
         # ======= Optimization HParams ======== #
         use_xla=FLAGS.use_xla,
         use_tf_amp=FLAGS.use_tf_amp,
+        use_dali=FLAGS.use_dali,
+        gpu_memory_fraction=FLAGS.gpu_memory_fraction,
         
         seed=FLAGS.seed,
     )
@@ -88,11 +94,13 @@ if __name__ == "__main__":
         log_dir=RUNNING_CONFIG.log_dir,
         model_dir=RUNNING_CONFIG.model_dir,
         data_dir=RUNNING_CONFIG.data_dir,
+        data_idx_dir=RUNNING_CONFIG.data_idx_dir,
 
         # ======= Optimization HParams ======== #
         use_xla=RUNNING_CONFIG.use_xla,
         use_tf_amp=RUNNING_CONFIG.use_tf_amp,
-
+        use_dali=RUNNING_CONFIG.use_dali,
+        gpu_memory_fraction=RUNNING_CONFIG.gpu_memory_fraction,
         seed=RUNNING_CONFIG.seed
     )
 
@@ -105,11 +113,15 @@ if __name__ == "__main__":
             warmup_steps=RUNNING_CONFIG.warmup_steps,
             log_every_n_steps=RUNNING_CONFIG.log_every_n_steps,
             weight_decay=RUNNING_CONFIG.weight_decay,
-            learning_rate_init=RUNNING_CONFIG.learning_rate_init,
+            lr_init=RUNNING_CONFIG.lr_init,
+            lr_warmup_epochs=RUNNING_CONFIG.lr_warmup_epochs,
             momentum=RUNNING_CONFIG.momentum,
-            loss_scale=RUNNING_CONFIG.loss_scale,
-            use_static_loss_scaling=FLAGS.use_static_loss_scaling,
+            loss_scale=RUNNING_CONFIG.loss_scale,       
+            label_smoothing=RUNNING_CONFIG.label_smoothing,
+            use_static_loss_scaling=RUNNING_CONFIG.use_static_loss_scaling,
+            use_cosine_lr=RUNNING_CONFIG.use_cosine_lr,
             is_benchmark=RUNNING_CONFIG.mode == 'training_benchmark',
+            
         )
 
     if RUNNING_CONFIG.mode in ["train_and_evaluate", 'evaluate', 'inference_benchmark']:

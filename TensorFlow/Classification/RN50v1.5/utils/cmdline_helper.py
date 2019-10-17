@@ -52,6 +52,14 @@ def parse_cmdline():
     )
 
     p.add_argument(
+        '--data_idx_dir',
+        required=False,
+        default=None,
+        type=str,
+        help="Path to index files for DALI. Files should be named 'train-*' and 'validation-*'."
+    )
+    
+    p.add_argument(
         '--batch_size', 
         type=int, 
         required=True, 
@@ -113,6 +121,14 @@ def parse_cmdline():
         required=False,
         help="""Initial value for the learning rate."""
     )
+    
+    p.add_argument(
+        '--lr_warmup_epochs',
+        default=5,
+        type=int,
+        required=False,
+        help="""Number of warmup epochs for learning rate schedule."""
+    )
 
     p.add_argument(
         '--weight_decay', 
@@ -147,7 +163,15 @@ def parse_cmdline():
         required=False,
         help="""Loss scale for FP16 Training and Fast Math FP32."""
     )
-
+    
+    p.add_argument(
+        '--label_smoothing',
+        type=float,
+        default=0.0,
+        required=False,
+        help="""The value of label smoothing."""
+    )
+    
     _add_bool_argument(
         parser=p,
         name="use_static_loss_scaling",
@@ -166,10 +190,26 @@ def parse_cmdline():
 
     _add_bool_argument(
         parser=p,
+        name="use_dali",
+        default=False,
+        required=False,
+        help="Enable DALI data input."
+    )
+
+    _add_bool_argument(
+        parser=p,
         name="use_tf_amp",
         default=False,
         required=False,
         help="Enable Automatic Mixed Precision to speedup FP32 computation using tensor cores."
+    )
+    
+    _add_bool_argument(
+        parser=p,
+        name="use_cosine_lr",
+        default=False,
+        required=False,
+        help="Use cosine learning rate schedule."
     )
 
     p.add_argument(
@@ -178,7 +218,14 @@ def parse_cmdline():
         default=1, 
         help="""Random seed."""
     )
-
+    
+    p.add_argument(
+        '--gpu_memory_fraction',
+        type=float,
+        default=0.7,
+        help="""Limit memory fraction used by training script for DALI"""
+    )
+    
     FLAGS, unknown_args = p.parse_known_args()
 
     if len(unknown_args) > 0:
